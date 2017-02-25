@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Clock using HTML 5 and CSS 3</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+        <style></style>
+    </head>
+    <body>
+        
+        <h1 style="text-align:center; font-size: 50px;">HTML 5 Canvas Clock</h1>
+        
+        <canvas id="myCanvas" width="600" height="600" style="border: 1px solid gray;margin-left:20%;">
+        
+        </canvas>
+        
+        
+        <script>
+            
+            /* 
+            
+            Solution:
+            
+            Overview of logic:
+            
+            There are two ways to get the time values for the second, minute, and hour hands.
+            
+            1. After every second get the current date time of the computer and use that time. The advantage is that the clock time will always be accurate assuming system time stays accurate. Since I have to get the system time, and calculate the hand positions I might as well run the code over and over each second because the code is already written.
+            
+            2. Get the current date time of the computer once in the beginning and use that time once to set the hand positions and then after each second increment the time values. The downside of this is that the accuracy of the clock may degrade over time. 
+            
+            There are a few different ways to move the hands:
+            
+            1. Calculate all possible hand positions for each hand (theta values) and map them to the unit of time for their corresponding hands. Using the current time lookup the theta position. This seems to have too much initial overhead and complexity.
+            
+            2. Simply get the current time and calculate the theta value and x,y values for that time. Yes, after 1 minute, and then 12 hours I will start running redundant calculations, but they are so cheap it doesnt matter.
+            
+            The clock face is made up of the following shapes/components:
+            
+            1. Large back clock face. Black.
+            2. Small center circle (second hand/closed nut). White.
+            3. Hour hand. Thickest and shortest line. White.
+            4. Minute hand. Middle thickness and middle length. White.
+            5. Second hand. Longest and thinnest. White.
+            6. Numbers 1-12 on clock face.
+            
+            Clock hands rotational behavior: 
+            
+            The clock hands are drawn to the current local system time every second.
+            The second hand rotates clockwise 1/60*2PI radians every second.
+            The minute hand rotates clockwise 1/60*2PI radians every 60 seconds.
+            The hour hand rotates clockwise 1/60*1/12*2PI radians every 60 seconds.
+            The hands never stop moving.
+            All other components don't move so they are drawn once in the beginning.
+            
+            Calculating hand positions:
+            
+            The center point of all hands is fixed and known.
+            The angle moved between time1 and time2 is known, and defined above.
+            The length of the hands is known.
+            The x,y coordinates of the ends of each hand are found using the following formulas:
+            
+            x=r*cos(t), y=r*sin(t), where t=theta (the angle moved between time1 and time2)
+            
+            Logical Flow of Program:
+            
+            Write a function that will be called every second. 
+            
+            I had to write a novel and think about the solution for a few minutes each day for a few days before I untangled my logic enough so as to write clear logic.
+            
+            This function will parse the current time and store integer values of second, minute, and hour into variables, and then convert the current digital time (integer representation of all three hands) into the corresponding theta for each hand. This is done by the following formulas:
+            
+            Rules for determining when hands change position:
+            
+            setInterval(f, 1000) and each second getSeconds(), getMinutes(), getHours().
+            Redraw hand positions based on above formulas. Using Date() properties after every second I remove time drift and I simplify the calculations and logic. The only possible issue is that the second hand does not move one time because of a small time drift, but the issue would only happen on the next second.
+            
+            Calculate theta for hour, minute, and second hands:
+            
+            Second hand:
+            
+            Second hand theta increments are only comprised of the current second value.
+             
+            Second hand theta increments: 1 * 1/60*2PI radians * 1.5PI radians (translate from 0PI or 3 O'Clock position to 1.5PI or 12 O'Clock position).
+            
+            To Do: make sure that translation is correct. = current second value * second hand theta constant
+            
+            Minute hand:
+            
+            Minute hand theta increments are only comprised of the current minute value.
+            
+            Minute hand theta increments: 1 * 1/60*2PI radians * 1.5PI radians = minute * minute hand theta constant
+            
+            Hour Hand:
+            
+            Hour hand theta positions are comprised of current hour theta plus current minute theta. The hour hand moves slightly after each minute. For example, when it is 1:30 the hour hand is between 1 and 2.
+            
+            So, 
+            
+            hour theta = whole hour theta + minute*hour theta
+            = current hour * 1/12*2PI radians + current minutes in current hour * 1/12*1/60*2PI radians
+            
+            Calculate the x,y positions of each hand using:
+            
+            x=r*cos(t), y=r*sin(t), where t=theta (the angle moved between time1 and time2)
+            
+            Draw the hands with up-to-date x,y positions.
+            
+            Repeat above logic after 1 second has passed.
+            
+            Repeat indefinitely.
+    
+            */
+        
+            
+            
+            var myCanvas = document.getElementById("myCanvas");
+            var context = myCanvas.getContext("2d");
+            
+            // Draw clock hands every second:
+            setInterval(drawClock, 1000);
+            
+            function drawClock() {
+               
+                // Note that I am redrawing the entire clock every second. This automatically removes old hands and draws new hands.
+                drawClockBacking();
+                drawNumbers();
+                drawSecondHand();
+                drawMinuteHand();
+                drawHourHand();
+                
+            }
+            
+            function drawClockBacking() {
+
+                // Draw circle - big black back of face.
+                context.beginPath();
+                context.arc(300, 300, 300, 0, 2*Math.PI);
+                context.stroke();
+                // Weird. If I do not set fillStyle to Black then the first time this function is called the black clockface is drawn and then the second time this function gets called the clock disappears (I assume it turns white and blends into the background).
+                context.fillStyle = "black";
+                context.fill();
+
+                // Draw circle - small white middle circle.
+                context.beginPath();
+                context.arc(300, 300, 15, 0, 2*Math.PI);
+                context.stroke();
+                context.fillStyle = "white";
+                context.fill();
+                
+            }
+            
+            // Draw numbers on clockface:
+            function drawNumbers() {
+                
+                // Clockface number coordinates:
+                var x = 0;
+                var y = 0;
+                
+                // Clockface center coordinates:
+                var xc = 285; // Why, Lord, why????
+                var yc = 315; // Why, Lord, why????
+                
+                // Clockface radius:
+                var r = 250;
+                
+                // Angle of clockface number, and rotate to align clockface numbers:
+                var theta = -(Math.PI/3);
+                
+                // The angle between each clockface number, ie 360 degrees/12
+                var step = (2*Math.PI)/12; // 12 numbers need to be evenly arranged around the clockface/circle.
+                
+                // Clockface number:
+                var clockFaceNumber = 1;
+                
+                // This helped: http://www.mathopenref.com/coordcirclealgorithm.html
+                // This "2*Math.PI-(Math.PI/2)" says, step until I've gone around the circle, ie, 360 deg - (translation amount + small amount more) so there's not an additional unwanted step, ie, this prevents 1 being overwritten by 13.
+                for(theta; theta <= (2*Math.PI-(Math.PI/2)); theta+=step)
+                    {
+                        
+                        x = xc + r * Math.cos(theta);
+                        y = yc + r * Math.sin(theta);
+                        context.fillStyle = "white";
+                        context.font = "40px Arial";
+                        context.fillText(clockFaceNumber, x, y);
+                        clockFaceNumber++;
+                        
+                    }
+                
+            }
+            
+            // Draw second hand:
+            function drawSecondHand() {
+                
+                // Outer point of second hand coordinates:
+                var x = 0;
+                var y = 0;
+                
+                // Second hand center coordinates:
+                var xc = 300;
+                var yc = 300;
+                
+                // Second hand radius:
+                var r = 250;
+                
+                // get current second value from system time
+                var d = new Date();
+                var seconds = d.getSeconds();
+                // set theta value = 360/seconds value, where 0 = "12" position, and 30 = "6" pos.
+                theta = (2 * Math.PI) * seconds * (1/60);
+                // Translation value to place theta into the correct position on the clockface.
+                var translationTheta = Math.PI/2;
+                theta = theta - translationTheta;
+                
+                // Calculate outer second hand (x,y) coords and draw second hand:        
+                x = xc + r * Math.cos(theta);
+                y = yc + r * Math.sin(theta);
+                context.beginPath();
+                context.moveTo(xc, yc);
+                context.lineTo(x, y);
+                context.lineWidth = 2;
+                context.strokeStyle = "white";
+                context.stroke();
+                
+            }
+            
+            // Draw minute hand:
+            function drawMinuteHand() {
+                
+                // Outer point of second hand coordinates:
+                var x = 0;
+                var y = 0;
+                
+                // Second hand center coordinates:
+                var xc = 300;
+                var yc = 300;
+                
+                // Second hand radius:
+                var r = 220;
+                
+                // get current second value from system time
+                var d = new Date();
+                var minutes = d.getMinutes();
+                // set theta value = 360/minutes value, where 0 = "12" position, and 30 = "6" pos.
+                theta = (2 * Math.PI) * minutes * (1/60);
+                // Translation value to place theta into the correct position on the clockface.
+                var translationTheta = Math.PI/2;
+                theta = theta - translationTheta;
+                
+                // Calculate outer second hand (x,y) coords and draw second hand:        
+                x = xc + r * Math.cos(theta);
+                y = yc + r * Math.sin(theta);
+                context.beginPath();
+                context.moveTo(xc, yc);
+                context.lineTo(x, y);
+                context.lineWidth = 4;
+                context.strokeStyle = "white";
+                context.stroke();
+                
+            }
+            
+            // Draw hour hand:
+            function drawHourHand() {
+                
+                // Outer point of second hand coordinates:
+                var x = 0;
+                var y = 0;
+                
+                // Second hand center coordinates:
+                var xc = 300;
+                var yc = 300;
+                
+                // Second hand radius:
+                var r = 175;
+                
+                // get current second value from system time
+                var d = new Date();
+                var minutes = d.getMinutes();
+                var hours = Math.abs(d.getHours()-12);
+                // set theta value = 360 deg/seconds value, where 0 = "12" position, and 30 = "6" pos. For hours the first half of the equation below gets me to the whole hour, and then I have to move the theta minutes/(60*12), b/c there are 60 steps inside one hour.
+                theta = ((2 * Math.PI) * hours * (1/12)) + ((2 * Math.PI) * minutes * (1/12)*(1/60));
+                // Translation value to place theta into the correct position on the clockface. Remember, your trig teacher taught you that PI/2 is quarter of a circle. Translate one quarter of a circle because the circle starts at the 3 o'clock position by default, and we need it to start at the top or 12 o'clock position.
+                var translationTheta = Math.PI/2;
+                theta = theta - translationTheta;
+                
+                // Calculate outer second hand (x,y) coords and draw second hand:        
+                x = xc + r * Math.cos(theta);
+                y = yc + r * Math.sin(theta);
+                context.beginPath();
+                context.moveTo(xc, yc);
+                context.lineTo(x, y);
+                context.lineWidth = 8;
+                context.strokeStyle = "white";
+                context.stroke();
+                
+            }
+            
+            
+        
+        </script>
+    </body>
+</html>
